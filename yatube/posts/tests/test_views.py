@@ -109,9 +109,8 @@ class TestPages(TestCase):
 
     def test_caching(self):
         response = self.client.get(reverse('posts:index'))
-        post = response.context['page_obj'][0]
         Post.objects.last().delete()
-        self.assertInHTML(f'<p>{post.text}</p>', response.content)
+        self.assertContains(response, self.post.text)
         response = self.client.get(reverse('posts:index'))
         posts = response.context['page_obj']
         self.assertEqual(0, len(posts))
