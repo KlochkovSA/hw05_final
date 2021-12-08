@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Об авторе проекта{% endblock %}
+{% block content %}
+  <div class="container py-5">
+    <h1>Привет</h1>
+    <h3>Автор этого сайта - Сергей</h3>
+    <p>
+      Я создал это веб приложение в ходе выполнения учебного проекта блока
+      "Бэкэнд на Django" в Яндекс.Практикум. <br>
+      Ознакомиться с технологиями вы можете
+      <a href="{% url 'about:tech' %}">здесь</a>
+    </p>
+      <ul>
+        <li>Python</li>
+        <li>SQL</li>
+        <li>HTML, CSS, Bootstrap</li>
+        <li>Django: ORM, Testing</li>
+      </ul>
+  </div>
+{% endblock content %}
