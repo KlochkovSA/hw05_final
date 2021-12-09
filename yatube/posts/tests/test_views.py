@@ -107,14 +107,6 @@ class TestPages(TestCase):
         post = response.context['page_obj'][0]
         self.assertNotEqual(post.group, self.group2)
 
-    def test_caching(self):
-        response = self.client.get(reverse('posts:index'))
-        Post.objects.last().delete()
-        self.assertContains(response, self.post.text)
-        response = self.client.get(reverse('posts:index'))
-        posts = response.context['page_obj']
-        self.assertEqual(0, len(posts))
-
 
 class PaginatorViewsTest(TestCase):
     _n_records_page1 = 10
@@ -158,6 +150,10 @@ class PaginatorViewsTest(TestCase):
                                   + PaginatorViewsTest._n_records_page2)
         ])
 
+    def setUp(self):
+        self.authorized_client = Client()
+        self.authorized_client.force_login(self.user)
+
     def test_check_last_post(self):
         for viewname, arg in self.reverse_args:
             response = self.client.get(reverse(viewname, args=arg))
@@ -184,3 +180,11 @@ class PaginatorViewsTest(TestCase):
             self.assertEqual(HTTPStatus.OK, response.status_code)
             expected_count = len(response.context['page_obj'])
             self.assertEqual(expected_count, self._n_records_page2)
+
+    def test_caching(self):
+        response = self.client.get(reverse('posts:index'))
+        Post.objects.all().delete()
+        self.assertContains(response, self.posts[-1].text)
+        response = self.client.get(reverse('posts:index'))
+        posts = response.context['page_obj']
+        self.assertEqual(0, len(posts))
