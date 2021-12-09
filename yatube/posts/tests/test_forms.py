@@ -93,6 +93,7 @@ class TestPages(TestCase):
             data=form_data,
             follow=True
         )
+        self.assertEqual(HTTPStatus.OK, response.status_code)
         self.assertNotEqual(text_after, text_before)
         redirects_to = reverse('posts:profile',
                                kwargs={'username': self.user.username})
@@ -109,6 +110,9 @@ class TestPages(TestCase):
             data=form_data
         )
         self.assertEqual(comment_count + 1, Comment.objects.count())
+        last_comment = Comment.objects.last()
+        self.assertEqual(form_data['text'], last_comment.text)
+        self.assertEqual(self.user, last_comment.author)
 
     def test_unauthorised_cant_create_post(self):
         posts_count = Post.objects.count()
