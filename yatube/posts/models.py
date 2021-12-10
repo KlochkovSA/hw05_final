@@ -1,6 +1,5 @@
 from django.contrib.auth import get_user_model
 from django.db import models
-from django.db.models import ImageField
 
 User = get_user_model()
 
@@ -25,8 +24,9 @@ class Post(models.Model):
         help_text='Выберите группу'
     )
 
-    image = ImageField(
-        'Картинка',
+    image = models.ImageField(
+        verbose_name='Картинка',
+        help_text='Загрузите изображение',
         upload_to='posts/',
         blank=True
     )
@@ -50,23 +50,41 @@ class Group(models.Model):
 class Comment(models.Model):
     post = models.ForeignKey(Post,
                              related_name='comments',
+                             verbose_name='Пост',
                              on_delete=models.CASCADE
                              )
     author = models.ForeignKey(User,
                                related_name='comments',
+                               verbose_name='Автор',
                                on_delete=models.CASCADE
                                )
-    text = models.TextField()
+    text = models.TextField(help_text='Напишите что-нибудь')
     created = models.DateTimeField(auto_now_add=True)
 
 
 class Follow(models.Model):
+    id = models.AutoField(primary_key=True)
     user = models.ForeignKey(User,
+                             verbose_name='Подписчик',
                              related_name='follower',
-                             on_delete=models.CASCADE,
-                             null=True
+                             on_delete=models.CASCADE
                              )
     author = models.ForeignKey(User,
                                related_name='following',
+                               verbose_name='Автор',
                                on_delete=models.CASCADE
                                )
+
+    def save(self, *args, **kwargs):
+        if self.author == self.user:
+            raise Exception('Author cannot follow himself')
+        super(Follow, self).save(*args, **kwargs)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['author', 'user'],
+                condition=~models.Q(user=models.F('author')),
+                name='no_self_subscription'
+            ),
+        ]

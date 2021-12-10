@@ -11,22 +11,25 @@
     <div class="mb-5">
       <h1>Все посты пользователя {{ username }}</h1>
       <h3>Всего постов: {{ page_obj|length }}</h3>
-      {% if request.user != author %}
+      {% if request.user != author and request.user.is_authenticated %}
+      <form method="post">
+        {% csrf_token %}
         {% if following %}
-          <a
-            class="btn btn-lg btn-light"
-            href="{% url 'posts:profile_unfollow' author.username %}" role="button"
+          <button class="btn btn-primary"
+                  type="submit"
+                  formaction="{% url 'posts:profile_unfollow' author.username%}"
           >
             Отписаться
-          </a>
+          </button>
         {% else %}
-            <a
-              class="btn btn-lg btn-primary"
-              href="{% url 'posts:profile_follow' author.username %}" role="button"
-            >
-              Подписаться
-            </a>
+          <button class="btn btn-primary"
+                  type="submit"
+                  formaction="{% url 'posts:profile_follow' author.username%}"
+          >
+            Подписаться
+          </button>
         {% endif %}
+      </form>
       {% endif %}
     </div>
 

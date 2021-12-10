@@ -7,6 +7,9 @@
           {% csrf_token %}
           <div class="form-group mb-2">
             {{ form.text|addclass:"form-control" }}
+            <small class="form-text text-muted">
+              {{ form.text.help_text|safe }}
+            </small>
           </div>
           <button type="submit" class="btn btn-primary">Отправить</button>
         </form>

@@ -5,7 +5,8 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from ..models import Comment, Group, Post
+from ..models import Comment, Follow, Post
+from ..tests.fixtures import set_up_environment
 
 User = get_user_model()
 
@@ -14,29 +15,25 @@ class TestPages(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.user = User.objects.create_user(username='test_user')
-        cls.group = Group.objects.create(
-            title='ТЕСТ Группа',
-            slug='test_group_slug',
-            description='Группа созданная во время исполнения теста'
-        )
-        cls.post = Post.objects.create(
-            author=cls.user,
-            text='Тестовый пост',
-            group=cls.group
-        )
+        set_up_environment(cls)
 
     def setUp(self):
         self.authorized_client = Client()
         self.authorized_client.force_login(self.user)
 
+        self.follower_client = Client()
+        self.follower_client.force_login(self.follower)
+
+        self.author_client = Client()
+        self.author_client.force_login(self.author)
+
     def test_group_cant_use_existing_slug(self):
         posts_count = Post.objects.count()
         form_data = {
             'text': self.post.text,
-            'group': self.group.slug
+            'group': self.group1.slug
         }
-        response = self.authorized_client.post(
+        response = self.author_client.post(
             reverse('posts:post_create'),
             data=form_data,
             follow=True
@@ -60,11 +57,9 @@ class TestPages(TestCase):
         )
 
         posts_count = Post.objects.count()
-        form_data = {
-            'text': 'Текст из формы',
-            'group': self.group.pk,
-            'image': uploaded
-        }
+
+        form_data = {'text': 'Текст из формы', 'group': self.group1.pk,
+                     'image': uploaded}
         response = self.authorized_client.post(
             reverse('posts:post_create'),
             data=form_data,
@@ -86,9 +81,9 @@ class TestPages(TestCase):
         text_after = 'Текст после редактирования'
         form_data = {
             'text': text_after,
-            'group': self.group.pk
+            'group': self.group1.pk
         }
-        response = self.authorized_client.post(
+        response = self.author_client.post(
             reverse('posts:post_create'),
             data=form_data,
             follow=True
@@ -96,23 +91,57 @@ class TestPages(TestCase):
         self.assertEqual(HTTPStatus.OK, response.status_code)
         self.assertNotEqual(text_after, text_before)
         redirects_to = reverse('posts:profile',
-                               kwargs={'username': self.user.username})
+                               kwargs={'username': self.author.username})
         self.assertRedirects(response, redirects_to)
 
     def test_comment(self):
         comment_count = Comment.objects.count()
         form_data = {
-            'text': 'Анонимный пользователь комментирует пост'
+            'text': 'Комментарий автора'
+        }
+        self.author_client.post(
+            reverse('posts:add_comment',
+                    kwargs={'post_id': self.post.pk}),
+            data=form_data
+        )
+        last_comment = Comment.objects.last()
+        self.assertEqual(comment_count + 1, Comment.objects.count())
+        self.assertEqual(form_data['text'], last_comment.text)
+        self.assertEqual(self.author, last_comment.author)
+        form_data = {
+            'text': 'Комментарий комментатора'
         }
         self.authorized_client.post(
             reverse('posts:add_comment',
                     kwargs={'post_id': self.post.pk}),
             data=form_data
         )
-        self.assertEqual(comment_count + 1, Comment.objects.count())
+        self.assertEqual(comment_count + 2, Comment.objects.count())
         last_comment = Comment.objects.last()
         self.assertEqual(form_data['text'], last_comment.text)
         self.assertEqual(self.user, last_comment.author)
+
+    def test_follow_post(self):
+        redirects_to = f'/profile/{self.author.username}/'
+        followers_count_before = Follow.objects.all().count()
+        response = self.authorized_client.post(
+            reverse('posts:profile_follow',
+                    kwargs={'username': self.author.username}),
+        )
+        followers_count_after = Follow.objects.all().count()
+        self.assertEqual(followers_count_before + 1, followers_count_after)
+        self.assertRedirects(response, redirects_to, 302, 200)
+
+    def test_unfollow(self):
+        redirects_to = f'/profile/{self.author.username}/'
+        followers_count_before = Follow.objects.all().count()
+        response = self.follower_client.post(
+            reverse('posts:profile_unfollow',
+                    kwargs={'username': self.author.username}),
+        )
+        followers_count_after = Follow.objects.all().count()
+        self.assertEqual(followers_count_after, followers_count_before - 1)
+        self.assertRedirects(response, redirects_to, 302, 200)
 
     def test_unauthorised_cant_create_post(self):
         posts_count = Post.objects.count()
@@ -142,3 +171,21 @@ class TestPages(TestCase):
         )
 
         self.assertEqual(comment_count, Comment.objects.count())
+
+    def test_unauthorised_cant_follow(self):
+        followers_count = Follow.objects.count()
+        self.client.post(
+            reverse('posts:profile_follow',
+                    kwargs={'username': self.author.username}),
+        )
+
+        self.assertEqual(followers_count, Follow.objects.count())
+
+    def test_author_cant_follow(self):
+        followers_count = Follow.objects.count()
+        with self.assertRaises(Exception):
+            self.author_client.post(
+                reverse('posts:profile_follow',
+                        kwargs={'username': self.author.username}),
+            )
+            self.assertEqual(followers_count, Follow.objects.count())

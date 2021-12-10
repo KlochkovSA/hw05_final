@@ -1,12 +1,12 @@
 from http import HTTPStatus
 
 from django.contrib.auth import get_user_model
-from django.core.files.uploadedfile import SimpleUploadedFile
 from django.forms.fields import CharField, ChoiceField
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from ..models import Group, Post
+from ..models import Post
+from ..tests.fixtures import set_up_environment
 
 User = get_user_model()
 
@@ -15,36 +15,7 @@ class TestPages(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        small_gif = (
-            b'\x47\x49\x46\x38\x39\x61\x02\x00'
-            b'\x01\x00\x80\x00\x00\x00\x00\x00'
-            b'\xFF\xFF\xFF\x21\xF9\x04\x00\x00'
-            b'\x00\x00\x00\x2C\x00\x00\x00\x00'
-            b'\x02\x00\x01\x00\x00\x02\x02\x0C'
-            b'\x0A\x00\x3B'
-        )
-        cls.user = User.objects.create_user(username='test_user')
-        cls.group = Group.objects.create(
-            title='ТЕСТ Группа',
-            slug='test_group_slug',
-            description='Группа созданная во время исполнения теста'
-        )
-        cls.group2 = Group.objects.create(
-            title='ТЕСТ Группа2',
-            slug='test_group_slug_2',
-            description='Группа 2 созданная во время исполнения теста'
-        )
-        cls.image = SimpleUploadedFile(
-            name='small.gif',
-            content=small_gif,
-            content_type='image/gif'
-        )
-        cls.post = Post.objects.create(
-            author=cls.user,
-            text='Тестовый пост',
-            group=cls.group,
-            image=cls.image
-        )
+        set_up_environment(cls)
 
     def setUp(self):
         self.authorized_client = Client()
@@ -54,16 +25,18 @@ class TestPages(TestCase):
         templates_url_names = {
             reverse('posts:index'):
                 'posts/index.html',
-            reverse('posts:group_posts', kwargs={'slug': self.group.slug}):
+            reverse('posts:group_posts', kwargs={'slug': self.group1.slug}):
                 'posts/group_list.html',
-            reverse('posts:profile', kwargs={'username': self.user.username}):
+            reverse('posts:profile',
+                    kwargs={'username': self.author.username}):
                 'posts/profile.html',
             reverse('posts:post_detail', kwargs={'post_id': self.post.pk}):
                 'posts/post_detail.html',
             reverse('posts:post_create'):
                 'posts/create_post.html',
             reverse('posts:post_edit', kwargs={'post_id': self.post.pk}):
-                'posts/create_post.html'
+                'posts/create_post.html',
+            reverse('posts:follow_index'): 'posts/follow.html',
         }
         for reverse_name, template_name in templates_url_names.items():
             with self.subTest(reverse_name=reverse_name):
@@ -105,50 +78,26 @@ class TestPages(TestCase):
     def test_post_not_in_group(self):
         response = self.client.get(reverse('posts:index'))
         post = response.context['page_obj'][0]
-        self.assertNotEqual(post.group, self.group2)
+        self.assertNotEqual(post.group, self.empty_group)
 
 
 class PaginatorViewsTest(TestCase):
-    _n_records_page1 = 10
-    _n_records_page2 = 7
 
     @classmethod
     def setUpClass(cls):
+        from .. import views
+
         super().setUpClass()
-        cls.user = User.objects.create_user(username='test_user')
-        cls.group = Group.objects.create(
-            title='ТЕСТ Группа',
-            slug='test_group_slug',
-            description='Группа созданная во время исполнения теста'
-        )
+        # Переопределяем количество постов на странице
+        views.POSTS_PER_PAGE = 5
+        set_up_environment(cls)
         cls.reverse_args = [
             ['posts:index', []],
-            ['posts:group_posts', [cls.group.slug]],
-            ['posts:profile', [cls.user.username]]
+            ['posts:group_posts', [cls.group1.slug]],
+            ['posts:profile', [cls.author.username]]
         ]
 
-        small_gif = (
-            b'\x47\x49\x46\x38\x39\x61\x02\x00'
-            b'\x01\x00\x80\x00\x00\x00\x00\x00'
-            b'\xFF\xFF\xFF\x21\xF9\x04\x00\x00'
-            b'\x00\x00\x00\x2C\x00\x00\x00\x00'
-            b'\x02\x00\x01\x00\x00\x02\x02\x0C'
-            b'\x0A\x00\x3B'
-        )
-        cls.image = SimpleUploadedFile(
-            name='small.gif',
-            content=small_gif,
-            content_type='image/gif'
-        )
-
-        cls.posts = Post.objects.bulk_create([
-            Post(author=cls.user,
-                 text=f'Тестовый пост {i}',
-                 group=cls.group,
-                 image=cls.image
-                 ) for i in range(PaginatorViewsTest._n_records_page1
-                                  + PaginatorViewsTest._n_records_page2)
-        ])
+        cls.POSTS_PER_PAGE = views.POSTS_PER_PAGE
 
     def setUp(self):
         self.authorized_client = Client()
@@ -158,33 +107,53 @@ class PaginatorViewsTest(TestCase):
         for viewname, arg in self.reverse_args:
             response = self.client.get(reverse(viewname, args=arg))
             last_post = response.context['page_obj'][0]
-            last_post_idx = (PaginatorViewsTest._n_records_page1
-                             + PaginatorViewsTest._n_records_page2)
 
-            expected_text = self.posts[last_post_idx - 1].text
+            expected_text = self.posts[self.NUMBER_OF_POSTS - 1].text
             self.assertEqual(expected_text, last_post.text)
-            self.assertEqual(last_post.group, self.group)
-            self.assertEqual(last_post.author, self.user)
+            self.assertEqual(self.group1, last_post.group)
+            self.assertEqual(self.author, last_post.author)
             self.assertTrue(last_post.image)
 
-    def test_first_page_contains_ten_records(self):
+    def test_first_page_contains_five_posts(self):
         for viewname, arg in self.reverse_args:
             response = self.client.get(reverse(viewname, args=arg))
             self.assertEqual(HTTPStatus.OK, response.status_code)
             expected_count = len(response.context['page_obj'])
-            self.assertEqual(expected_count, self._n_records_page1)
+            self.assertEqual(expected_count, self.POSTS_PER_PAGE)
 
-    def test_second_page_contains_three_records(self):
+    def test_third_page_contains_one_post(self):
         for viewname, arg in self.reverse_args:
-            response = self.client.get(reverse(viewname, args=arg) + '?page=2')
+            response = self.client.get(reverse(viewname, args=arg) + '?page=3')
             self.assertEqual(HTTPStatus.OK, response.status_code)
             expected_count = len(response.context['page_obj'])
-            self.assertEqual(expected_count, self._n_records_page2)
+            self.assertEqual(expected_count, 1)
 
     def test_caching(self):
-        response = self.client.get(reverse('posts:index'))
+        index_url = reverse('posts:index')
+        response = self.client.get(index_url)
         Post.objects.all().delete()
         self.assertContains(response, self.posts[-1].text)
-        response = self.client.get(reverse('posts:index'))
+        response = self.client.get(index_url)
         posts = response.context['page_obj']
         self.assertEqual(0, len(posts))
+
+
+class TestFollowService(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        set_up_environment(cls)
+
+        cls.follower_client = Client()
+        cls.follower_client.force_login(cls.follower)
+
+        cls.authorized_client = Client()
+        cls.authorized_client.force_login(cls.user)
+
+    def test_follow_index(self):
+        follow_index_url = '/follow/'
+        response = self.follower_client.get(follow_index_url)
+        last_post = Post.objects.latest('pub_date')
+        self.assertContains(response, last_post.text)
+        response = self.authorized_client.get(follow_index_url)
+        self.assertNotIn(last_post.text, response)

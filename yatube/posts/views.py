@@ -6,9 +6,11 @@ from django.shortcuts import get_object_or_404, redirect, render
 from .forms import CommentForm, PostForm
 from .models import Follow, Group, Post
 
+POSTS_PER_PAGE = 10
+
 
 def get_page(request, posts):
-    paginator = Paginator(posts, 10)
+    paginator = Paginator(posts, POSTS_PER_PAGE)
     page_number = request.GET.get('page')
     return paginator.get_page(page_number)
 
@@ -38,7 +40,7 @@ def profile(request, username):
     posts = author.posts.all()
     paginator = get_page(request, posts)
     is_following = False
-    if request.user.is_authenticated:
+    if request.user.is_authenticated and request.user != author:
         is_following = Follow.objects.filter(user=request.user,
                                              author=author
                                              ).exists()
@@ -114,15 +116,18 @@ def follow_index(request):
 
 @login_required
 def profile_follow(request, username):
-    author = get_object_or_404(get_user_model(), username=username)
-    user = request.user
-    Follow.objects.get_or_create(user=user, author=author)
+    # Запрос вида POST без данных
+    if request.method == 'POST':
+        author = get_object_or_404(get_user_model(), username=username)
+        user = request.user
+        Follow.objects.get_or_create(user=user, author=author)
     return redirect('posts:profile', username=username)
 
 
 @login_required
 def profile_unfollow(request, username):
-    author = get_object_or_404(get_user_model(), username=username)
-    user = request.user
-    Follow.objects.get(user=user, author=author).delete()
+    if request.method == 'POST':
+        author = get_object_or_404(get_user_model(), username=username)
+        user = request.user
+        Follow.objects.get(user=user, author=author).delete()
     return redirect('posts:profile', username=username)
