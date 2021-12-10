@@ -181,11 +181,11 @@ class TestPages(TestCase):
 
         self.assertEqual(followers_count, Follow.objects.count())
 
-    def test_author_cant_follow(self):
+    def test_author_cant_follow_himself(self):
         followers_count = Follow.objects.count()
-        with self.assertRaises(Exception):
-            self.author_client.post(
-                reverse('posts:profile_follow',
-                        kwargs={'username': self.author.username}),
-            )
-            self.assertEqual(followers_count, Follow.objects.count())
+        self.author_client.post(
+            reverse('posts:profile_follow',
+                    kwargs={'username': self.author.username}),
+        )
+        self.assertEqual(followers_count, Follow.objects.count())
+

@@ -82,16 +82,6 @@ class TestPostsURLS(TestCase):
         response = self.authorised_client.get(comment_url)
         self.assertRedirects(response, redirects_to)
 
-    def test_follow_url_get(self):
-        """ Проверка, что в результате GET запроса база данных не изменятся """
-        profile_url = f'/profile/{self.author.username}/'
-        follow_url = f'/profile/{self.author.username}/follow/'
-        followers_count = self.author.following.count()
-        self.assertEqual(1, followers_count)
-        response = self.authorised_client.get(follow_url)
-        self.assertRedirects(response, profile_url)
-        self.assertEqual(followers_count, Follow.objects.all().count())
-
     def test_author_cannot_follow(self):
         follow_url = f'/profile/{self.author.username}/follow/'
         redirects_to = f'/profile/{self.author.username}/'

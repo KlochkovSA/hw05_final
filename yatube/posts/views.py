@@ -116,18 +116,17 @@ def follow_index(request):
 
 @login_required
 def profile_follow(request, username):
-    # Запрос вида POST без данных
-    if request.method == 'POST':
-        author = get_object_or_404(get_user_model(), username=username)
-        user = request.user
+
+    author = get_object_or_404(get_user_model(), username=username)
+    user = request.user
+    if author != user:
         Follow.objects.get_or_create(user=user, author=author)
     return redirect('posts:profile', username=username)
 
 
 @login_required
 def profile_unfollow(request, username):
-    if request.method == 'POST':
-        author = get_object_or_404(get_user_model(), username=username)
-        user = request.user
-        Follow.objects.get(user=user, author=author).delete()
+    author = get_object_or_404(get_user_model(), username=username)
+    user = request.user
+    Follow.objects.get(user=user, author=author).delete()
     return redirect('posts:profile', username=username)
