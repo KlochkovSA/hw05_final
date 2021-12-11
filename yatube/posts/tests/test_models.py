@@ -117,3 +117,6 @@ class ModelsTest(TestCase):
             Follow.objects.create(user=self.author, author=self.author)
             follows_count_after = Follow.objects.all().count()
             self.assertEqual(follows_count_before, follows_count_after)
+
+    def tearDown(self):
+        del self
