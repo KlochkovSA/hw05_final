@@ -1,11 +1,12 @@
 from http import HTTPStatus
 
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.forms.fields import CharField, ChoiceField
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from ..models import Post
+from ..models import Follow, Post
 from ..tests.fixtures import set_up_environment
 
 User = get_user_model()
@@ -103,6 +104,9 @@ class PaginatorViewsTest(TestCase):
         self.authorized_client = Client()
         self.authorized_client.force_login(self.user)
 
+        self.author_client = Client()
+        self.author_client.force_login(self.author)
+
     def test_check_last_post(self):
         for viewname, arg in self.reverse_args:
             response = self.client.get(reverse(viewname, args=arg))
@@ -131,29 +135,91 @@ class PaginatorViewsTest(TestCase):
     def test_caching(self):
         index_url = reverse('posts:index')
         response = self.client.get(index_url)
-        Post.objects.all().delete()
         self.assertContains(response, self.posts[-1].text)
+        Post.objects.all().delete()
+        cache.clear()
         response = self.client.get(index_url)
-        posts = response.context['page_obj']
-        self.assertEqual(0, len(posts))
+        self.assertNotContains(response, self.posts[-1].text)
 
 
-class TestFollowService(TestCase):
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        set_up_environment(cls)
+class TestFollowPages(TestCase):
 
-        cls.follower_client = Client()
-        cls.follower_client.force_login(cls.follower)
+    def setUp(self):
+        set_up_environment(self)
+        self.follower_client = Client()
+        self.follower_client.force_login(self.follower)
 
-        cls.authorized_client = Client()
-        cls.authorized_client.force_login(cls.user)
+        self.authorized_client = Client()
+        self.authorized_client.force_login(self.user)
 
-    def test_follow_index(self):
+        self.author_client = Client()
+        self.author_client.force_login(self.author)
+
+    def test_follow(self):
+        follow_url = f'/profile/{self.author.username}/follow/'
+        redirects_to = f'/profile/{self.author.username}/'
+
+        follows_count_before = Follow.objects.all().count()
+        response = self.authorized_client.get(follow_url)
+        follows_count_after = Follow.objects.all().count()
+
+        self.assertEqual(follows_count_before + 1, follows_count_after)
+        self.assertRedirects(response, redirects_to)
+
+    def test_unfollow(self):
+        un_follow_url = f'/profile/{self.author.username}/unfollow/'
+        redirects_to = f'/profile/{self.author.username}/'
+
+        follows_count_before = Follow.objects.all().count()
+        response = self.follower_client.get(un_follow_url)
+        follows_count_after = Follow.objects.all().count()
+
+        self.assertEqual(follows_count_before - 1, follows_count_after)
+        self.assertRedirects(response, redirects_to)
+
+    def test_unauthorised_cant_follow(self):
+        followers_count = Follow.objects.count()
+        self.client.post(
+            reverse('posts:profile_follow',
+                    kwargs={'username': self.author.username}),
+        )
+        self.assertEqual(followers_count, Follow.objects.count())
+
+    def test_author_cant_follow_himself(self):
+        followers_count = Follow.objects.count()
+        self.author_client.post(
+            reverse('posts:profile_follow',
+                    kwargs={'username': self.author.username}),
+        )
+        self.assertEqual(followers_count, Follow.objects.count())
+
+    def tearDown(self):
+        del self
+
+
+class TestUnfollow(TestCase):
+    def setUp(self):
+        set_up_environment(self)
+        self.follower_client = Client()
+        self.follower_client.force_login(self.follower)
+
+    def test_follower_index(self):
         follow_index_url = '/follow/'
         response = self.follower_client.get(follow_index_url)
-        last_post = Post.objects.latest('pub_date')
-        self.assertContains(response, last_post.text)
+        last_post = response.context['page_obj'][0]
+        required_post = Post.objects.latest('pub_date')
+        self.assertEqual(required_post.text, last_post.text)
+
+
+class TestFollow(TestCase):
+    def setUp(self):
+        set_up_environment(self)
+
+        self.authorized_client = Client()
+        self.authorized_client.force_login(self.user)
+
+    def test_not_follower_cannot_read_posts(self):
+        follow_index_url = '/follow/'
         response = self.authorized_client.get(follow_index_url)
-        self.assertNotIn(last_post.text, response)
+        posts_count = len(response.context['page_obj'])
+        self.assertEqual(0, posts_count)
