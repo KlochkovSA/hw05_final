@@ -172,19 +172,5 @@ class TestPages(TestCase):
 
         self.assertEqual(comment_count, Comment.objects.count())
 
-    def test_unauthorised_cant_follow(self):
-        followers_count = Follow.objects.count()
-        self.client.post(
-            reverse('posts:profile_follow',
-                    kwargs={'username': self.author.username}),
-        )
-
-        self.assertEqual(followers_count, Follow.objects.count())
-
-    def test_author_cant_follow_himself(self):
-        followers_count = Follow.objects.count()
-        self.author_client.post(
-            reverse('posts:profile_follow',
-                    kwargs={'username': self.author.username}),
-        )
-        self.assertEqual(followers_count, Follow.objects.count())
+    def tearDown(self):
+        del self
