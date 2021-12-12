@@ -156,8 +156,10 @@ class TestFollowPages(TestCase):
         self.author_client.force_login(self.author)
 
     def test_follow(self):
-        follow_url = f'/profile/{self.author.username}/follow/'
-        redirects_to = f'/profile/{self.author.username}/'
+        follow_url = reverse('posts:profile_follow',
+                             kwargs={'username': self.author.username})
+        redirects_to = reverse('posts:profile',
+                               kwargs={'username': self.author.username})
 
         follows_count_before = Follow.objects.all().count()
         response = self.authorized_client.get(follow_url)
@@ -167,8 +169,10 @@ class TestFollowPages(TestCase):
         self.assertRedirects(response, redirects_to)
 
     def test_unfollow(self):
-        un_follow_url = f'/profile/{self.author.username}/unfollow/'
-        redirects_to = f'/profile/{self.author.username}/'
+        un_follow_url = reverse('posts:profile_unfollow',
+                                kwargs={'username': self.author.username})
+        redirects_to = reverse('posts:profile',
+                               kwargs={'username': self.author.username})
 
         follows_count_before = Follow.objects.all().count()
         response = self.follower_client.get(un_follow_url)
@@ -204,7 +208,7 @@ class TestUnfollow(TestCase):
         self.follower_client.force_login(self.follower)
 
     def test_follower_index(self):
-        follow_index_url = '/follow/'
+        follow_index_url = reverse('posts:follow_index')
         response = self.follower_client.get(follow_index_url)
         last_post = response.context['page_obj'][0]
         required_post = Post.objects.latest('pub_date')
@@ -219,7 +223,7 @@ class TestFollow(TestCase):
         self.authorized_client.force_login(self.user)
 
     def test_not_follower_cannot_read_posts(self):
-        follow_index_url = '/follow/'
+        follow_index_url = reverse('posts:follow_index')
         response = self.authorized_client.get(follow_index_url)
         posts_count = len(response.context['page_obj'])
         self.assertEqual(0, posts_count)
