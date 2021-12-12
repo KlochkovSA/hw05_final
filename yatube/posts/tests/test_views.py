@@ -212,11 +212,14 @@ class TestUnfollow(TestCase):
         self.follower_client.force_login(self.follower)
 
     def test_follower_index(self):
+        created_post = Post.objects.create(author=self.author,
+                                           text='Тест страницы подписок',
+                                           )
         follow_index_url = reverse('posts:follow_index')
         response = self.follower_client.get(follow_index_url)
+        self.assertEqual(HTTPStatus.OK, response.status_code)
         last_post = response.context['page_obj'][0]
-        required_post = Post.objects.latest('pub_date')
-        self.assertEqual(required_post.text, last_post.text)
+        self.assertEqual(created_post.text, last_post.text)
 
 
 class TestFollow(TestCase):
@@ -229,5 +232,6 @@ class TestFollow(TestCase):
     def test_not_follower_cannot_read_posts(self):
         follow_index_url = reverse('posts:follow_index')
         response = self.authorized_client.get(follow_index_url)
+        self.assertEqual(HTTPStatus.OK, response.status_code)
         posts_count = len(response.context['page_obj'])
         self.assertEqual(0, posts_count)
