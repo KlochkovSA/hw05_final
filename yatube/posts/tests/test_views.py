@@ -163,9 +163,13 @@ class TestFollowPages(TestCase):
 
         follows_count_before = Follow.objects.all().count()
         response = self.authorized_client.get(follow_url)
+        self.assertEqual(HTTPStatus.FOUND, response.status_code)
         follows_count_after = Follow.objects.all().count()
 
         self.assertEqual(follows_count_before + 1, follows_count_after)
+        follow_obj = Follow.objects.order_by('id').last()
+        self.assertEqual(self.author, follow_obj.author)
+        self.assertEqual(self.user, follow_obj.user)
         self.assertRedirects(response, redirects_to)
 
     def test_unfollow(self):
