@@ -84,7 +84,7 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'yatube.urls'
 
-SECRET_KEY = ')^x+a+!c^5!lnf)rofcr@nz^ee-4ou=bp=#f0!agd2$gr53*%6'
+SECRET_KEY = os.getenv('DJANGO_KEY')
 
 STATIC_URL = '/static/'
 STATICFILES_DIRS = (os.path.join(BASE_DIR, 'static'),)
