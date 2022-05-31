@@ -11,7 +11,7 @@ Stack:
  - Python 3.7
  - Django 2.2.19
 
-### Local test deployment
+### Local deployment (development mode)
 - Clone the repo, create and activate the virtual Python enviroment.
 ```sh
 python3 -m venv venv
