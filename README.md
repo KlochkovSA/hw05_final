@@ -18,10 +18,14 @@ python3 -m venv venv
 source ./venv/bin/activate
 ```
 - Install the requirements
-```
+```sh
 pip install -r requirements.txt
 ``` 
-- Run the server:
+- Write the Django Key to enviroment variable
+```sh
+export DJANGO_KEY=SECRET_KEY_VALUE
 ```
+- Run the server:
+```sh
 python3 yatube/manage.py runserver
 ```
